@@ -61,13 +61,13 @@ public class Proposer {
         prepare();
         promiseMajorityLock.lock();
         try {
-//            boolean getMajorityPromise = promiseMajority.await(
-//                    Constants.WAIT_TIMEOUT, TimeUnit.SECONDS);
-//            if (!getMajorityPromise) {
-//                System.out.println()
-//                return false;
-//            }
-            promiseMajority.await();
+            boolean getMajorityPromise = promiseMajority.await(
+                    Constants.WAIT_TIMEOUT, TimeUnit.SECONDS);
+            if (getMajorityPromise == false) {
+                System.out.println("initEvent failed to get majority promise");
+                return false;
+            }
+            // promiseMajority.await();
             System.out.println("Got the signal of majority");
         } catch (Exception e) {
             exit(1);

@@ -42,15 +42,17 @@ public class Node {
     /**
      *  Destructor */
     public void close() {
+        System.out.println("Node closing");
         try {
             serializeEvents();
             serializeCalendar();
         } catch (Exception e) {
-            System.err.println("Serialization failure");
+            System.err.println("Serialization failure " + e);
         }
     }
 
     /**** Getters ****/
+
     public int getNodeId() {
         return nodeId;
     }
@@ -96,18 +98,36 @@ public class Node {
     }
 
     /**** Setters ****/
+
+    /**
+     * addToAllEvents: add given eventRecord to given index. If there is a gap
+     * between given index and current allEvent size, send out request for the
+     * missing events
+     * @param index
+     * @param er
+     * @return
+     */
     public boolean addToAllEvents(int index, EventRecord er) {
         lock.lock();
-        while (allEvents.size() <= index) {
+        while (allEvents.size() < index) {
+            int missingLogId = allEvents.size();
             allEvents.add(null);
+            requestMissingEventsId(missingLogId);
         }
-        if (allEvents.get(index) != null) {
-            allEvents.add(index, er);
+        if (allEvents.size() == index) {
+            allEvents.add(er);
             lock.unlock();
             return true;
         }
         lock.unlock();
         return false;
+    }
+
+    private PaxosMessage generateLearnerRequest(int log_id) {
+        PaxosMessage requestMsg = new PaxosMessage(
+                PaxosMessageType.LEARNER_REQUEST, -1, log_id, -1,
+                nodeId, null);
+        return requestMsg;
     }
 
     /**
@@ -117,7 +137,7 @@ public class Node {
      */
     public void updateCalendar(EventRecord er) {
         Appointment appt = er.getAppointment();
-        System.out.println("appt = " + appt);
+        // System.out.println("appt = " + appt);
         switch (er.getOperation()) {
             case ADD:
                 insertAppointment(appt);
@@ -218,6 +238,13 @@ public class Node {
         System.out.println();
     }
 
+    /**
+     * updateMissingEvents: send LEARNER_REQUEST messages to other nodes to
+     * request event/log lines beyond current existing lines in allEvents.
+     * If replies are received from other nodes, the message will be handled by
+     * learner from ListenChannel thread and received log line will be added in
+     * allEvents. The process will continue until no new log line is received.
+     */
     public void updateMissingEvents() {
         lock.lock();
         int allEventsSize = allEvents.size();
@@ -226,19 +253,18 @@ public class Node {
         System.out.println("Get missing events, please wait...");
         while (true) {
             for (int i = 0; i < Constants.MISSING_EVENT_BATCH_SIZE; ++i) {
-                PaxosMessage requestMsg = new PaxosMessage(
-                        PaxosMessageType.LEARNER_REQUEST, -1, newLogId + i,
-                        -1, nodeId, null);
+                PaxosMessage requestMsg = generateLearnerRequest(newLogId + i);
                 try {
                     requestMsg.sendToAll();
                 } catch (Exception e) {
-                    ;
+                    System.out.println("Cannot send message to other peers " +
+                            e);
                 }
             }
             try {
                 Thread.sleep(Constants.SLEEP_LENGTH);
             } catch (Exception e) {
-                ;
+                System.err.println("updateMissingEvents sleep failed " + e);
             }
             lock.lock();
             int updatedAllEventsSize = allEvents.size();
@@ -246,11 +272,24 @@ public class Node {
             if (updatedAllEventsSize == allEventsSize) {
                 break;
             }
+            allEventsSize = updatedAllEventsSize;
         }
         System.out.println("All events are update to date");
     }
 
+    public void requestMissingEventsId(int log_id) {
+        PaxosMessage requestMsg = generateLearnerRequest(log_id);
+        requestMsg.sendToAll();
+    }
+
     /**** Helper functions ****/
+
+    /**
+     * generateNewApptId: generate appointment id with the format:
+     * "n<nodeId>a<localApptId>"
+     * localApptId will be incremented for each call
+     * @return
+     */
     private String generateNewApptId() {
         String id = "n" + Integer.toString(nodeId) + "a" +
                 Integer.toString(localApptId);
@@ -258,6 +297,11 @@ public class Node {
         return id;
     }
 
+    /**
+     * hasConflict: Check if given appt conflicts with existing appointments
+     * @param appt
+     * @return
+     */
     private boolean hasConflict(Appointment appt) {
         int day = appt.getDay();
         int start = appt.getStartTime();
@@ -276,6 +320,10 @@ public class Node {
         return false;
     }
 
+    /**
+     * insertAppointment: Add given appt to apptIdMap and globalTimetable
+     * @param appt
+     */
     private void insertAppointment(Appointment appt) {
 //        System.out.println("Inserting appt");
         String apptId = appt.getId();
@@ -291,6 +339,10 @@ public class Node {
         }
     }
 
+    /**
+     * removeAppointment: remove given appt from apptIdMap and globalTimetable
+     * @param appt
+     */
     private void removeAppointment(Appointment appt) {
         String apptId = appt.getId();
         int day = appt.getDay();
@@ -313,7 +365,8 @@ public class Node {
      * @throws Exception
      */
     private boolean deserializeEvents() throws Exception {
-        String filename = Constants.EVENTRECORD_FILENAME;
+        String filename = Integer.toString(nodeId) + "_" +
+                Constants.EVENTRECORD_FILENAME;
         File fd = new File(filename);
         if (fd.exists()) {
             FileInputStream fileIn = null;
@@ -347,7 +400,8 @@ public class Node {
         globalTimetable = new String[3][Constants.TOTAL_DAY][Constants.SLOT_PER_DAY];
         apptIdMap = new HashMap<>();
 
-        String filename = Constants.CALENDAR_FILENAME;
+        String filename = Integer.toString(nodeId) + "_" +
+                Constants.CALENDAR_FILENAME;
         File fd = new File(filename);
         if (fd.exists()) {
             FileInputStream fileIn = null;
@@ -389,7 +443,8 @@ public class Node {
      * @throws Exception
      */
     private boolean serializeEvents() throws Exception {
-        String filename = Constants.EVENTRECORD_FILENAME;
+        String filename = Integer.toString(nodeId) + "_" +
+                Constants.EVENTRECORD_FILENAME;
         File fd = new File(filename);
         FileOutputStream fileOut = new FileOutputStream(fd);
         ObjectOutputStream objOut = new ObjectOutputStream(fileOut);
@@ -403,7 +458,8 @@ public class Node {
      * @throws Exception
      */
     private boolean serializeCalendar() throws Exception {
-        String filename = Constants.CALENDAR_FILENAME;
+        String filename = Integer.toString(nodeId) + "_" +
+                Constants.CALENDAR_FILENAME;
         File fd = new File(filename);
         FileOutputStream fileOut = new FileOutputStream(fd);
         ObjectOutputStream objOut = new ObjectOutputStream(fileOut);

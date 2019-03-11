@@ -8,6 +8,7 @@ import java.lang.System.*;
 import java.net.ServerSocket;
 import java.util.*;
 
+import static java.lang.System.exit;
 import static java.util.Map.entry;
 
 public class PaxosMain {
@@ -18,7 +19,7 @@ public class PaxosMain {
             curNodeId = parseArgs(args);
         } catch (Exception e) {
             System.err.println(e);
-            System.exit(1);
+            exit(1);
         }
 
         System.out.println("Node id = " + curNodeId);
@@ -31,7 +32,7 @@ public class PaxosMain {
             server = new ServerSocket(port);
         } catch (Exception e) {
             System.err.println("Cannot create server socket");
-            System.exit(1);
+            exit(1);
         }
         ListenChannel listenThread = new ListenChannel(server, node);
         listenThread.start();
@@ -41,20 +42,21 @@ public class PaxosMain {
 
         Scanner sc = new Scanner(System.in);
         boolean endProgram = false;
-        while (sc.hasNextLine() && !endProgram) {
+        while (sc.hasNextLine() && endProgram == false) {
             String input = sc.nextLine();
-            handleCommand(input, endProgram, node);
+            handleCommand(input, node);
         }
-        node.close();
         System.out.println("Ending the program");
+        node.close();
+        System.out.println("Program ended");
     }
 
-    private static void handleCommand(String input, boolean endProgram,
-                                      Node node) {
+    private static void handleCommand(String input, Node node) {
         Scanner sc = new Scanner(input);
         String operation = null;
         if (sc.hasNext()) {
             operation = sc.next();
+            System.out.println("operation = " + operation);
         } else {
             return;
         }
@@ -68,9 +70,9 @@ public class PaxosMain {
             case "view":
                 handleViewCommand(sc, node);
                 break;
-            case "quit":
             case "exit":
-                endProgram = true;
+                node.close();
+                exit(0);
                 break;
             default:
                 handleInvalidCommand();

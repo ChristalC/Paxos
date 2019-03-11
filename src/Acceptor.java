@@ -43,7 +43,7 @@ public class Acceptor {
         int proposerId = msg.getNodeId();
         NodeAddress proposerAddr = Constants.NODEID_ADDR_MAP.get(proposerId);
         try {
-            System.out.println("Sending out promise msg to pId " + pId);
+            System.out.println("Sending out promise msg for pId " + pId);
             promiseMsg.sendToAddr(proposerAddr.getIp(), proposerAddr.getPort());
         } catch (Exception e) {
             System.err.println("Send promise failed " + e);

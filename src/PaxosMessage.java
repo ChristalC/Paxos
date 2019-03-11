@@ -51,7 +51,7 @@ public class PaxosMessage implements Serializable {
         return er;
     }
 
-    public void sendToAll() throws Exception {
+    public void sendToAll() {
         for (NodeAddress addr: Constants.NODEID_ADDR_MAP.values()) {
 //            System.out.println("send to ip: " + addr.getIp() + ", port: " +
 //                    addr.getPort());
@@ -59,15 +59,28 @@ public class PaxosMessage implements Serializable {
         }
     }
 
-    public void sendToAddr(String ip, int port) throws Exception {
-        Socket socket = new Socket(ip, port);
-        ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+    public void sendToAddr(String ip, int port) {
         try {
+            Thread.sleep(1000);
+        } catch (Exception e) {
+            System.err.println("sendToAddr sleep failed " + e);
+        }
+        Socket socket = null;
+        ObjectOutputStream oos = null;
+        try {
+            socket = new Socket(ip, port);
+            oos = new ObjectOutputStream(socket.getOutputStream());
             oos.writeObject(this);
         } catch (Exception e) {
-            System.err.println("send message exception " + e);
-        } finally {
+            System.err.println("sendToAddr " + ip + ", port: " + port +
+                    ", failed + " + e);
+            return;
+        }
+        try {
             oos.close();
+            socket.close();
+        } catch (Exception e) {
+            System.err.println("oos or socket close failed. " + e);
         }
     }
 }
