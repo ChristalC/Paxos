@@ -99,6 +99,8 @@ public class PaxosMain {
         boolean deleteResult = node.deleteAppointment(apptDeleteId);
         if (!deleteResult) {
             System.out.println("Appointment does not exist");
+        } else {
+            System.out.println("Appointment " +  apptDeleteId + " is deleted");
         }
     }
 
@@ -159,7 +161,7 @@ public class PaxosMain {
             System.out.println("Appointment cannot be added because of " +
                     "conflicts");
         } else {
-            System.out.println("Appointment \"" + apptName + "\"added");
+            System.out.println("Appointment \"" + apptName + "\" added");
         }
     }
 

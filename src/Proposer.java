@@ -41,6 +41,7 @@ public class Proposer {
         targetValAccepted = true;
         promiseCount = 0;
         acceptCount = 0;
+        valuesLock = new ReentrantLock();
 
         promiseMajorityLock = new ReentrantLock();
         promiseMajority = promiseMajorityLock.newCondition();

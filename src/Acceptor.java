@@ -12,9 +12,6 @@ public class Acceptor {
             ListenChannel.class.getName());
 
     private Map<Integer, AcceptorStore> logIdToStoreMap;
-//    private int promisedId;
-//    private int acceptedId;
-//    private EventRecord acceptedER;
     private int nodeId;
 
     /* Constructor */

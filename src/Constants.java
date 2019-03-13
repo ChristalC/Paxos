@@ -9,17 +9,17 @@ import static java.util.Map.entry;
 import java.util.logging.Level;
 
 public class Constants {
-//    public static final Map<Integer, NodeAddress> NODEID_ADDR_MAP =
-//            Map.ofEntries(
-//                    entry(0, new NodeAddress("Localhost", 5001)),
-//                    entry(1, new NodeAddress("Localhost", 5002)),
-//                    entry(2, new NodeAddress("Localhost", 5003))
-//            );
-
     public static final Map<Integer, NodeAddress> NODEID_ADDR_MAP =
             Map.ofEntries(
-                    entry(0, new NodeAddress("localhost", 5001))
+                    entry(0, new NodeAddress("Localhost", 5001)),
+                    entry(1, new NodeAddress("Localhost", 5002)),
+                    entry(2, new NodeAddress("Localhost", 5003))
             );
+
+//    public static final Map<Integer, NodeAddress> NODEID_ADDR_MAP =
+//            Map.ofEntries(
+//                    entry(0, new NodeAddress("localhost", 5001))
+//            );
 
     public static final ArrayList<String> DAYS_OF_WEEK = new ArrayList<>(
             Arrays.asList("Sunday", "Monday", "Tuesday", "Wednesday",
@@ -44,6 +44,6 @@ public class Constants {
     public static final int MISSING_EVENT_BATCH_SIZE = 10;
     public static final int SLEEP_LENGTH = 5000;    // Milliseconds
 
-    // public static final Level GLOBAL_LOG_LEVEL = Level.WARNING;
     public static final Level GLOBAL_LOG_LEVEL = Level.WARNING;
+    // public static final Level GLOBAL_LOG_LEVEL = Level.INFO;
 }
