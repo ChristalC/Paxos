@@ -6,9 +6,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
+
 import static java.lang.System.exit;
 
 public class Proposer {
+    private final static Logger LG = Logger.getLogger(
+            Proposer.class.getName());
+
     private int nodeId;
     private int logId;
     private int prepareId;
@@ -42,6 +47,8 @@ public class Proposer {
 
         acceptMajorityLock = new ReentrantLock();
         acceptMajority = acceptMajorityLock.newCondition();
+
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
     }
 
     public void restart() {
@@ -54,7 +61,7 @@ public class Proposer {
     }
 
     public boolean initEvent(int log_id, EventRecord er) {
-        System.out.println("initEvent " + log_id);
+        LG.info("initEvent " + log_id);
         logId = log_id;
         targetVal = er;
 
@@ -64,27 +71,29 @@ public class Proposer {
             boolean getMajorityPromise = promiseMajority.await(
                     Constants.WAIT_TIMEOUT, TimeUnit.SECONDS);
             if (getMajorityPromise == false) {
-                System.out.println("initEvent failed to get majority promise");
+                LG.info("initEvent failed to get majority promise");
                 return false;
             }
             // promiseMajority.await();
-            System.out.println("Got the signal of majority");
+            LG.info("initEvent got the majority promise");
         } catch (Exception e) {
             exit(1);
         } finally {
             promiseMajorityLock.unlock();
         }
 
-        System.out.println("Next step: propose");
+        LG.info("Next step: propose");
 
         propose();
         acceptMajorityLock.lock();
         try {
             boolean getMajorityAccept = acceptMajority.await(
                     Constants.WAIT_TIMEOUT, TimeUnit.SECONDS);
-            if (!getMajorityAccept) {
+            if (getMajorityAccept == false) {
+                LG.info("initEvent failed to get majority accept");
                 return false;
             }
+            LG.info("initEvent got the majority accept");
         } catch (Exception e) {
             exit(1);
         } finally {
@@ -131,11 +140,11 @@ public class Proposer {
         PaxosMessage msg = new PaxosMessage(PaxosMessageType.PROPOSE, prepareId,
                 logId, -1, nodeId,
                 receivedVal == null ? targetVal : receivedVal);
-        System.err.println("Sending proposals");
+        LG.info("Sending proposals");
         try {
             msg.sendToAll();
         } catch (Exception e) {
-            System.err.println("send proposal failed " + e);
+            LG.warning("send proposal failed " + e);
         }
     }
 
@@ -153,15 +162,18 @@ public class Proposer {
             receivedVal = msg.getER();
         }
 
+        valuesLock.lock();
         ++promiseCount;
+        LG.info("promiseCount = " + promiseCount);
+
         promiseMajorityLock.lock();
-        System.out.println("promiseCount = " + promiseCount);
         if (promiseCount >= Constants.MAJORITY_COUNT) {
-//            System.out.println("got the majority");
+            LG.info("got the majority promise");
             promiseMajority.signal();
         } else {
-            System.out.println("Not got the majority");
+            LG.info("Not got the majority promise yet");
         }
+        valuesLock.unlock();
         promiseMajorityLock.unlock();
     }
 
@@ -173,11 +185,13 @@ public class Proposer {
             return;
         }
 
+        valuesLock.lock();
         ++acceptCount;
         acceptMajorityLock.lock();
         if (acceptCount >= Constants.MAJORITY_COUNT) {
             acceptMajority.signal();
         }
+        valuesLock.unlock();
         acceptMajorityLock.unlock();
     }
 

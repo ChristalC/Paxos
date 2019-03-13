@@ -3,8 +3,11 @@
  */
 
 import java.util.*;
+import java.util.logging.Logger;
 
 public class Learner {
+    private final static Logger LG = Logger.getLogger(
+            Learner.class.getName());
     private Node node;
     private int nodeId;
 
@@ -12,6 +15,7 @@ public class Learner {
     public Learner(Node node_obj) {
         node = node_obj;
         nodeId = node_obj.getNodeId();
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
     }
 
     /**
@@ -22,16 +26,16 @@ public class Learner {
     public void handleLearnerNotice(PaxosMessage msg) {
         int logId = msg.getLogId();
         EventRecord er = msg.getER();
-        System.out.println("handleLearnerNotice er = " + er);
+        LG.info("handleLearnerNotice er = " + er);
         try {
             node.addToAllEvents(logId, er);
         } catch (Exception e) {
-            System.err.println("learner addToAllEvents failed + " + e);
+            LG.warning("learner addToAllEvents failed + " + e);
         }
         try {
             node.updateCalendar(er);
         } catch (Exception e) {
-            System.err.println("learner updateCalendar failed + " + e);
+            LG.warning("learner updateCalendar failed + " + e);
         }
     }
 
@@ -44,24 +48,24 @@ public class Learner {
     public void handleLearnerRequest(PaxosMessage msg) {
         NodeAddress addr = Constants.NODEID_ADDR_MAP.get(msg.getNodeId());
         int requestedLogId = msg.getLogId();
-        System.out.println("requested logid = " + requestedLogId);
+        LG.info("requested logid = " + requestedLogId);
 
         ArrayList<EventRecord> learnedER = node.getAllEvents();
-        System.out.println("learnedER.size() = " + learnedER.size());
+        LG.info("learnedER.size() = " + learnedER.size());
         if (requestedLogId < learnedER.size()) {
-            System.out.println("learnedER.get(requestedLogId) = " +
+            LG.info("learnedER.get(requestedLogId) = " +
                     learnedER.get(requestedLogId));
         }
         if (learnedER.size() > requestedLogId &&
                 learnedER.get(requestedLogId) != null) {
-            System.out.println("handleLearnerRequest sending reply");
+            LG.info("handleLearnerRequest sending reply");
             PaxosMessage replyMsg = new PaxosMessage(
                     PaxosMessageType.LEARNER_NOTICE, -1, requestedLogId,
                     -1, nodeId, learnedER.get(requestedLogId));
             try {
                 replyMsg.sendToAddr(addr.getIp(), addr.getPort());
             } catch (Exception e) {
-                System.err.println("HandleLearnerRequest replyMsg failed " +
+                LG.warning("HandleLearnerRequest replyMsg failed " +
                         e);
             }
         }

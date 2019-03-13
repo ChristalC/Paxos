@@ -5,8 +5,12 @@
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.*;
+import java.util.logging.Logger;
 
 public class PaxosMessage implements Serializable {
+    private final static Logger LG = Logger.getLogger(
+            PaxosMessage.class.getName());
+
     private PaxosMessageType msgType;
     private int pId;
     private int logId;
@@ -24,6 +28,8 @@ public class PaxosMessage implements Serializable {
         acceptedId = accepted_id;
         nodeId = node_id;
         er = event_record;
+
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
     }
 
     /* Getters */
@@ -53,17 +59,17 @@ public class PaxosMessage implements Serializable {
 
     public void sendToAll() {
         for (NodeAddress addr: Constants.NODEID_ADDR_MAP.values()) {
-//            System.out.println("send to ip: " + addr.getIp() + ", port: " +
-//                    addr.getPort());
+            LG.info("send to ip: " + addr.getIp() + ", port: " +
+                    addr.getPort());
             sendToAddr(addr.getIp(), addr.getPort());
         }
     }
 
     public void sendToAddr(String ip, int port) {
         try {
-            Thread.sleep(1000);
+            Thread.sleep(200);
         } catch (Exception e) {
-            System.err.println("sendToAddr sleep failed " + e);
+            LG.warning("sendToAddr sleep failed " + e);
         }
         Socket socket = null;
         ObjectOutputStream oos = null;
@@ -72,15 +78,16 @@ public class PaxosMessage implements Serializable {
             oos = new ObjectOutputStream(socket.getOutputStream());
             oos.writeObject(this);
         } catch (Exception e) {
-            System.err.println("sendToAddr " + ip + ", port: " + port +
-                    ", failed + " + e);
+            LG.warning("sendToAddr " + ip + ", port: " + port +
+                    ", failed " + e);
             return;
         }
+
         try {
             oos.close();
             socket.close();
         } catch (Exception e) {
-            System.err.println("oos or socket close failed. " + e);
+            LG.warning("oos or socket close failed. " + e);
         }
     }
 }

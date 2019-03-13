@@ -7,13 +7,22 @@ import java.lang.reflect.Array;
 import java.lang.System.*;
 import java.net.ServerSocket;
 import java.util.*;
+import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static java.lang.System.exit;
 import static java.util.Map.entry;
 
 public class PaxosMain {
+    private final static Logger LG = Logger.getLogger(
+            PaxosMain.class.getName());
+
     /* Main function */
     public static void main(String[] args) {
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
         int curNodeId = -1;
         try {
             curNodeId = parseArgs(args);
@@ -22,7 +31,7 @@ public class PaxosMain {
             exit(1);
         }
 
-        System.out.println("Node id = " + curNodeId);
+        LG.info("Node id = " + curNodeId);
         Node node = new Node(curNodeId);
 
         /* Create listen thread */
@@ -31,7 +40,7 @@ public class PaxosMain {
         try {
             server = new ServerSocket(port);
         } catch (Exception e) {
-            System.err.println("Cannot create server socket");
+            LG.severe("Cannot create server socket");
             exit(1);
         }
         ListenChannel listenThread = new ListenChannel(server, node);
@@ -40,6 +49,7 @@ public class PaxosMain {
         /* Pick up records that might have been missed before node start */
         node.updateMissingEvents();
 
+        /* Start to take user input */
         Scanner sc = new Scanner(System.in);
         boolean endProgram = false;
         while (sc.hasNextLine() && endProgram == false) {
@@ -56,7 +66,7 @@ public class PaxosMain {
         String operation = null;
         if (sc.hasNext()) {
             operation = sc.next();
-            System.out.println("operation = " + operation);
+            LG.info("operation = " + operation);
         } else {
             return;
         }
@@ -82,7 +92,7 @@ public class PaxosMain {
 
     private static void handleDeleteCommand(Scanner sc, Node node) {
         if (!sc.hasNext()) {
-            System.err.println("Appointment id to delete is missing.");
+            System.out.println("Appointment id to delete is missing.");
             return;
         }
         String apptDeleteId = sc.next();
@@ -94,9 +104,9 @@ public class PaxosMain {
 
     private static void handleViewCommand(Scanner sc, Node node) {
         if (sc.hasNext()) {
-            node.displayCalendarAll();
+            node.displayCalendarAllByAppt();
         } else {
-            node.displayCalendar(node.getNodeId());
+            node.displayCalendarByAppt(node.getNodeId());
         }
     }
 
@@ -105,7 +115,7 @@ public class PaxosMain {
         if (sc.hasNext()) {
             apptName = sc.next();
         } else {
-            System.err.println("Invalid appointment name");
+            System.out.println("Invalid appointment name");
             return;
         }
 
@@ -113,7 +123,7 @@ public class PaxosMain {
         if (sc.hasNextInt()) {
             day = sc.nextInt();
         } else {
-            System.err.println("Invalid appointment day");
+            System.out.println("Invalid appointment day");
             return;
         }
 
@@ -121,7 +131,7 @@ public class PaxosMain {
         if (sc.hasNextInt()) {
             start = sc.nextInt();
         } else {
-            System.err.println("Invalid appointment start time");
+            System.out.println("Invalid appointment start time");
             return;
         }
 
@@ -129,7 +139,7 @@ public class PaxosMain {
         if (sc.hasNextInt()) {
             end = sc.nextInt();
         } else {
-            System.err.println("Invalid appointment end time");
+            System.out.println("Invalid appointment end time");
             return;
         }
 
@@ -140,20 +150,21 @@ public class PaxosMain {
                 participants.add(Integer.valueOf(sc.nextInt()));
             }
         } else {
-            System.err.println("Invalid appointment participant");
+            System.out.println("Invalid appointment participant");
         }
 
         boolean addApptResult = node.addAppointment(apptName, day, start, end,
                 participants);
         if (!addApptResult) {
-            System.out.println("Appointment cannot be added, conflicts");
+            System.out.println("Appointment cannot be added because of " +
+                    "conflicts");
         } else {
             System.out.println("Appointment \"" + apptName + "\"added");
         }
     }
 
     private static void handleInvalidCommand() {
-        System.err.println("Invalid command");
+        System.out.println("Invalid command");
     }
 
     /**

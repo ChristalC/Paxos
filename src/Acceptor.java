@@ -5,8 +5,12 @@
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class Acceptor {
+    private final static Logger LG = Logger.getLogger(
+            ListenChannel.class.getName());
+
     private Map<Integer, AcceptorStore> logIdToStoreMap;
 //    private int promisedId;
 //    private int acceptedId;
@@ -16,13 +20,20 @@ public class Acceptor {
     /* Constructor */
     public Acceptor(int node_id) {
         logIdToStoreMap = new HashMap<>();
-//        promisedId = -1;
-//        acceptedId = -1;
-//        acceptedER = null;
         nodeId = node_id;
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
     }
 
+    /**
+     * handlePrepare: handle the prepare message with pId
+     * Acceptor will promise to the pId unless it has already promised to a
+     * greater pId.
+     * If it has already accepted a value, send the <accepted pId, value> back
+     * to proposer together with the promise message.
+     * @param msg
+     */
     public void handlePrepare(PaxosMessage msg) {
+        LG.info("Handling prepare message");
         int pId = msg.getPId();
         int logId = msg.getLogId();
         if (!logIdToStoreMap.containsKey(logId)) {
@@ -42,23 +53,26 @@ public class Acceptor {
                 pId, msg.getLogId(), acceptedId, nodeId, acceptedER);
         int proposerId = msg.getNodeId();
         NodeAddress proposerAddr = Constants.NODEID_ADDR_MAP.get(proposerId);
-        try {
-            System.out.println("Sending out promise msg for pId " + pId);
-            promiseMsg.sendToAddr(proposerAddr.getIp(), proposerAddr.getPort());
-        } catch (Exception e) {
-            System.err.println("Send promise failed " + e);
-        }
+        LG.info("Sending out promise msg for pId " + pId);
+        promiseMsg.sendToAddr(proposerAddr.getIp(), proposerAddr.getPort());
     }
 
+    /**
+     * handlePropose: handle the propose message with <pId, value>
+     * Acceptor will accept the proposed value unless it has previously
+     * promised to a pId that is greater than current pId.
+     * If accepted, send out an accept message. Otherwise, neglect the message.
+     * @param msg
+     */
     public void handlePropose(PaxosMessage msg) {
-        System.out.println("Handling propose message");
+        LG.info("Handling propose message");
         int logId = msg.getLogId();
         int msgPId = msg.getPId();
 
         int curPromisedId = logIdToStoreMap.getOrDefault(logId,
                 new AcceptorStore()).promisedId;
         if (msgPId < curPromisedId) {
-            System.out.println("Reject propose msg, pId = " + msgPId);
+            LG.info("Reject propose msg, pId = " + msgPId);
             return;
         }
 
@@ -70,12 +84,8 @@ public class Acceptor {
                 msgPId, msg.getLogId(), msgPId, nodeId, msg.getER());
         int proposerId = msg.getNodeId();
         NodeAddress proposerAddr = Constants.NODEID_ADDR_MAP.get(proposerId);
-        try {
-            System.out.println("Sending accept msg");
-            acceptMsg.sendToAddr(proposerAddr.getIp(), proposerAddr.getPort());
-        } catch (Exception e) {
-            System.out.println("Send accept failed");
-        }
+        LG.info("Sending accept msg");
+        acceptMsg.sendToAddr(proposerAddr.getIp(), proposerAddr.getPort());
     }
 
     private class AcceptorStore {

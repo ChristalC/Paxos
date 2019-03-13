@@ -5,9 +5,13 @@
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.logging.Logger;
 
 
 public class ListenChannel extends Thread {
+    private final static Logger LG = Logger.getLogger(
+            ListenChannel.class.getName());
+
     private ServerSocket server;
     private Node node;
 
@@ -15,8 +19,13 @@ public class ListenChannel extends Thread {
     public ListenChannel(ServerSocket s, Node n) {
         server = s;
         node = n;
+
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
     }
 
+    /**
+     * run: thread to listen to incoming messages
+     */
     public void run() {
         while (true) {
             try {
@@ -25,8 +34,7 @@ public class ListenChannel extends Thread {
                         socket.getInputStream());
                 PaxosMessage paxosMsg = (PaxosMessage)ois.readObject();
                 PaxosMessageType type = paxosMsg.getMsgType();
-                System.out.println("Received paxos message " + type);
-                // ois.close();
+                LG.info("Received paxos message " + type);
                 switch (type) {
                     case PREPARE:
                         node.getAccepter().handlePrepare(paxosMsg);
@@ -52,7 +60,7 @@ public class ListenChannel extends Thread {
                 ois.close();
                 socket.close();
             } catch (Exception e) {
-                System.out.println("receiving failed " + e);
+                LG.warning("receiving failed " + e);
             }
         }
     }

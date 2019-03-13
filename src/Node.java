@@ -6,8 +6,12 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 
 public class Node {
+    private final static Logger LG = Logger.getLogger(
+            Node.class.getName());
+
     private int nodeId;
     private Lock lock = new ReentrantLock();
     private Map<String, Appointment> apptIdMap;
@@ -22,12 +26,13 @@ public class Node {
 
     /* Constructor: initialize the environment */
     public Node(int id) {
+        LG.setLevel(Constants.GLOBAL_LOG_LEVEL);
         nodeId = id;
         try {
             deserializeEvents();
             deserializeCalendar();
         } catch (Exception e) {
-            System.err.println("error");
+            LG.severe("Failed to deserialize past events/calendar, exit");
             System.exit(1);
         }
         proposer = new Proposer(nodeId);
@@ -42,12 +47,12 @@ public class Node {
     /**
      *  Destructor */
     public void close() {
-        System.out.println("Node closing");
+        LG.info("Node closing");
         try {
             serializeEvents();
             serializeCalendar();
         } catch (Exception e) {
-            System.err.println("Serialization failure " + e);
+            LG.warning("Serialization failure " + e);
         }
     }
 
@@ -74,13 +79,6 @@ public class Node {
     public ArrayList<EventRecord> getAllEvents() {
         lock.lock();
         ArrayList<EventRecord> result = allEvents;
-        lock.unlock();
-        return result;
-    }
-
-    public int getAllEventsSize() {
-        lock.lock();
-        int result = allEvents.size();
         lock.unlock();
         return result;
     }
@@ -163,7 +161,7 @@ public class Node {
     public boolean addAppointment(String name, int day, int start, int end,
                                    ArrayList<Integer> p) {
         String newApptId = generateNewApptId();
-        System.out.println("Adding new appointment");
+        LG.info("Adding new appointment");
         Appointment newAppt = new Appointment(newApptId, name, day, start, end,
                 p, nodeId);
         boolean addEventResult = false;
@@ -172,7 +170,7 @@ public class Node {
         lock.unlock();
 
         while (!hasConflict(newAppt) && addEventResult == false) {
-            System.out.println("No conflict, start paxos");
+            LG.info("No conflict, start paxos");
             EventRecord newEvent = new EventRecord(EventOperation.ADD, 0,
                     nodeId, newAppt);
             int newEventLogId = allEvents.size();
@@ -215,13 +213,13 @@ public class Node {
         return removeEventResult;
     }
 
-    public void displayCalendarAll() {
+    public void displayCalendarAllBySlot() {
         for (int nodeId = 0; nodeId < Constants.NODE_COUNT; ++nodeId) {
-            displayCalendar(nodeId);
+            displayCalendarBySlot(nodeId);
         }
     }
 
-    public void displayCalendar(int nodeId) {
+    public void displayCalendarBySlot(int nodeId) {
         System.out.println("node: " + nodeId);
         System.out.printf("day/time ");
         for (int i = 0; i < Constants.SLOT_PER_DAY; ++i) {
@@ -236,6 +234,36 @@ public class Node {
             System.out.println();
         }
         System.out.println();
+    }
+
+    public void displayCalendarAllByAppt() {
+        for (int nodeId = 0; nodeId < Constants.NODE_COUNT; ++nodeId) {
+            displayCalendarByAppt(nodeId);
+        }
+    }
+
+    public void displayCalendarByAppt(int nodeId) {
+        System.out.println("node: " + nodeId);
+        for (int day = 0; day < Constants.TOTAL_DAY; ++day) {
+            System.out.println("---- day " + day + " ----");
+            String prevApptId = "";
+            for (int slot = 0; slot < Constants.SLOT_PER_DAY; ++slot) {
+                String apptId = globalTimetable[nodeId][day][slot];
+                if (apptId != null && apptId != prevApptId) {
+                    prevApptId = apptId;
+                    Appointment appt = apptIdMap.get(apptId);
+                    System.out.println("Name: " + appt.getName());
+                    System.out.println("Id: " + apptId);
+                    System.out.println("Start time: " + appt.getStartTime());
+                    System.out.println("End time: " + appt.getEndTime());
+                    System.out.print("Participants: ");
+                    for (Integer p: appt.getParticipantsId()) {
+                        System.out.print(p + "  ");
+                    }
+                    System.out.print("\n\n");
+                }
+            }
+        }
     }
 
     /**
@@ -257,8 +285,7 @@ public class Node {
                 try {
                     requestMsg.sendToAll();
                 } catch (Exception e) {
-                    System.out.println("Cannot send message to other peers " +
-                            e);
+                    LG.warning("Cannot send message to other peers " + e);
                 }
             }
             try {
@@ -291,8 +318,7 @@ public class Node {
      * @return
      */
     private String generateNewApptId() {
-        String id = "n" + Integer.toString(nodeId) + "a" +
-                Integer.toString(localApptId);
+        String id = String.format("n%03da%04d", nodeId, localApptId);
         ++localApptId;
         return id;
     }
@@ -361,12 +387,10 @@ public class Node {
 
     /**
      * deserializeEvents: initialize the object variable allEvents
-     * @return
-     * @throws Exception
      */
-    private boolean deserializeEvents() throws Exception {
-        String filename = Integer.toString(nodeId) + "_" +
-                Constants.EVENTRECORD_FILENAME;
+    private void deserializeEvents() throws Exception {
+        String filename = String.format(nodeId + "_" +
+                Constants.EVENTRECORD_FILENAME);
         File fd = new File(filename);
         if (fd.exists()) {
             FileInputStream fileIn = null;
@@ -387,21 +411,18 @@ public class Node {
         } else {
             allEvents = new ArrayList<>();
         }
-        return true;
     }
 
     /**
      * deserializeCalendar: initialize the object variables apptIdMap and
      * globalTimetable
-     * @return
-     * @throws Exception
      */
-    private boolean deserializeCalendar() throws Exception {
+    private void deserializeCalendar() throws Exception {
         globalTimetable = new String[3][Constants.TOTAL_DAY][Constants.SLOT_PER_DAY];
         apptIdMap = new HashMap<>();
 
-        String filename = Integer.toString(nodeId) + "_" +
-                Constants.CALENDAR_FILENAME;
+        String filename = String.format(nodeId + "_" +
+                Constants.CALENDAR_FILENAME);
         File fd = new File(filename);
         if (fd.exists()) {
             FileInputStream fileIn = null;
@@ -434,36 +455,31 @@ public class Node {
                 }
             }
         }
-        return true;
     }
 
     /**
      * serializeEvents: store object variable allEvents to file
-     * @return
      * @throws Exception
      */
-    private boolean serializeEvents() throws Exception {
-        String filename = Integer.toString(nodeId) + "_" +
-                Constants.EVENTRECORD_FILENAME;
+    private void serializeEvents() throws Exception {
+        String filename = String.format(nodeId + "_" +
+                Constants.EVENTRECORD_FILENAME);
         File fd = new File(filename);
         FileOutputStream fileOut = new FileOutputStream(fd);
         ObjectOutputStream objOut = new ObjectOutputStream(fileOut);
         objOut.writeObject(allEvents);
-        return true;
     }
 
     /**
      * serializeCalendar: store object variable apptIdMap to file
-     * @return
      * @throws Exception
      */
-    private boolean serializeCalendar() throws Exception {
-        String filename = Integer.toString(nodeId) + "_" +
-                Constants.CALENDAR_FILENAME;
+    private void serializeCalendar() throws Exception {
+        String filename = String.format(nodeId + "_" +
+                Constants.CALENDAR_FILENAME);
         File fd = new File(filename);
         FileOutputStream fileOut = new FileOutputStream(fd);
         ObjectOutputStream objOut = new ObjectOutputStream(fileOut);
         objOut.writeObject(apptIdMap);
-        return true;
     }
 }
