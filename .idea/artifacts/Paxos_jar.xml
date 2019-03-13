@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Paxos:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Paxos_jar</output-path>
+    <root id="archive" name="Paxos.jar">
+      <element id="module-output" name="Paxos" />
+    </root>
+  </artifact>
+</component>
